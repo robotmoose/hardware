@@ -1,0 +1,21 @@
+<html>
+	<head>
+		<title>Video Test</title>
+		<h1>Video Test</h1>
+
+		<script>
+			function refresh()
+			{
+				var src="cam.jpg?";
+				src+="time="+new Date().getTime()+"&";
+				src+="who="+document.getElementById("host").value+"&";
+				document.getElementById("cam").src=src;
+			}
+		</script>
+
+	</head>
+	<body>
+		<img id="cam" src="cam.jpg" onload="refresh();" onerror="refresh();"/><br/>
+		host:<input type="text" value="172.20.227.15:8081" id="host"/>
+	</body>
+</html>

@@ -1,0 +1,21 @@
+[Eagle]
+Version="07 05 00"
+Platform="Mac OS X"
+Serial="62191E841E-LSR-WLM-1EL"
+Globals="Globals"
+Desktop="Desktop"
+
+[Globals]
+AutoSaveProject=1
+UsedLibrary="/Volumes/Data/Seafile/Projects & Development/Eagle/Libraries/Custom/Isaac.lbr"
+UsedLibrary="/Volumes/Data/Seafile/Projects & Development/Eagle/Libraries/cmonr/Other/te-connectivity.lbr"
+
+[Win_1]
+Type="Control Panel"
+Loc="146 109 968 531"
+State=2
+Number=0
+
+[Desktop]
+Screen="1280 800"
+Window="Win_1"

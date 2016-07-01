@@ -1,0 +1,32 @@
+Netlist
+
+Exported from neato.sch at 3/29/2016 10:08 PM
+
+EAGLE Version 7.5.0 Copyright (c) 1988-2015 CadSoft
+
+Net      Part     Pad      Pin        Sheet
+
+N$1      C1       2        2          1
+         C2       2        2          1
+         MOTOR    2        S          1
+         NEATO    4        S          1
+         X1       2        2          1
+
+N$2      C2       1        1          1
+         MOTOR    1        S          1
+         T1       1        C          1
+
+N$3      R1       1        1          1
+         X1       4        4          1
+
+N$4      C1       1        1          1
+         NEATO    1        S          1
+         T1       3        E          1
+         X1       8        8          1
+
+N$5      NEATO    2        S          1
+         X1       6        6          1
+
+N$6      R1       2        2          1
+         T1       2        B          1
+

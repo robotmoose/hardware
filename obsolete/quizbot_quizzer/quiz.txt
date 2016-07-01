@@ -1,0 +1,23 @@
+What do servos do?
+Move robot parts
+Hold the universe together
+Allow the computer to "boot"
+Make coffee
+
+What board controls the Quizbot?
+Arduino
+Cappucino
+Internet
+
+What code would move the robot head up?
+neck.write(100);
+neck.write(20);
+neck, move up please.
+SYNTAX ERROR: expected (;)
+
+What?  WHAT?  WHAAAA???!!!!
+Yup
+Maybe
+Yes
+No
+

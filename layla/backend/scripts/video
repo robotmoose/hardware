@@ -1,0 +1,7 @@
+#!/bin/sh
+#  Backend script: start video chat via firefox
+killall firefox
+cd `dirname $0`
+. ./config
+
+DISPLAY=:0 firefox https://www.gruveo.com/#$videoname &

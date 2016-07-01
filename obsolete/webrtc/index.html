@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html style="margin:0px;padding:0px;width:100%;overflow:hidden;">
+	<head style="margin:0px;padding:0px;width:100%;height:100%;overflow:hidden;">
+		<script src="http://robotmoose.com/js/input_validation.js"></script>
+		<script src="http://robotmoose.com/js/uri.js"></script>
+		<script src="http://robotmoose.com/js/utility.js"></script>
+		<script src="http://robotmoose.com/js/xmlhttp.js"></script>
+
+		<script src="latest.js"></script>
+		<script src="js/chatter.js"></script>
+		<script src="js/hover_handle.js"></script>
+		<script src="js/video_manager.js"></script>
+
+		<div id="video" style="margin:0px;padding:0px;width:100%;height:100%;position:absolute;top:0;"></div>
+		<div id="chat_window" style="margin:0px;padding:0px;width:100%;height:0%;position:absolute;bottom:0;"></div>
+
+		<script>
+			var uri=parse_uri(location.search);
+
+			var video_manager_div=document.getElementById("video");
+			var video_manager=new video_manager_t(video_manager_div);
+
+			var left_hover=new hover_handle_t(video_manager.switching_div,"left");
+			left_hover.onclick=function(){video_manager.left();};
+
+			var right_hover=new hover_handle_t(video_manager.switching_div,"right");
+			right_hover.onclick=function(){video_manager.right();};
+
+			var webrtc=new SimpleWebRTC
+			({
+				localVideoEl:null,
+				remoteVideosEl:video_manager.remote_div,
+				autoRequestMedia:true,
+				peerConnectionConfig:
+				{
+					iceServers:
+					[
+						{"url":"stun:robotmoose.com:3478"},
+						{"url":"stun:stun.l.google.com:19302"}
+					]
+				},
+				localVideo:
+				{
+					mirror:false
+				},
+			});
+			video_manager.webrtc=webrtc;
+
+			var show_chat=true;
+
+			if(uri.chat)
+				show_chat=(uri.chat.toLowerCase()!="false"&&uri.chat.toLowerCase()!="0");
+
+			if(show_chat)
+			{
+				var chatter_div=document.getElementById("chat_window");
+				var chatter=new chatter_t(chatter_div,webrtc);
+				video_manager_div.style.height="80%";
+				chatter_div.style.height="20%";
+				video_manager.onreceive=function(message){chatter.receive(message);}
+			}
+
+			var doorways=false;
+
+			if(uri.doorways)
+				doorways=(uri.doorways.toLowerCase()!="false"&&uri.doorways.toLowerCase()!="0");
+
+			function setup_webrtc()
+			{
+				webrtc.on("videoAdded",function(video,peer){video_manager.create(video,peer);});
+				webrtc.on("videoRemoved",function(video,peer){video_manager.remove(video,peer);});
+				webrtc.on("readyToCall",function(){webrtc.joinRoom(uri.robot);});
+			}
+
+			validate_robot_name
+			(
+				uri.robot,
+				function(){setup_webrtc();},
+				function(){console.log("Invalid robot name \""+uri.robot+"\".");}
+			);
+		</script>
+	</head>
+	<body style="margin:0px;padding:0px;width:100%;height:100%;overflow:hidden;">
+	</body>
+</html>

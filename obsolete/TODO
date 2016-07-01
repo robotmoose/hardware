@@ -1,0 +1,27 @@
+windows api (doorways):
+	need:
+		-Ability to alert, changing color of titlebar and tab.
+
+	completely optional at this point:
+		-Touch events...
+
+achievements:
+	need:
+		-Create (server side only).
+		-Delete (server side only).
+		-Widget.
+		-Unlock animation.
+
+book keeping:
+	-Documentation...
+	-Lesson plan audit.
+	-Instructional picture audit.
+
+backend:
+	-Fix disconnect reconnect problem.
+
+ui:
+	-Ability to create a ui in a new widget.
+
+webrtc:
+	-Add chat window.
