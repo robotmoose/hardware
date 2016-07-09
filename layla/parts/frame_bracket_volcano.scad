@@ -70,5 +70,5 @@ tube_bracket([0,0,0]);
 for (more=[0:1])
     translate([radius*(2+2*more),0,0])
 		scale([more*2-1,1,1])  // flip left and right
-			tube_bracket([11,0,0]);
+			tube_bracket([7,0,0]);
 
