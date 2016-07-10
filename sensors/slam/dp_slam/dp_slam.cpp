@@ -9,12 +9,16 @@
 
 coord_t::coord_t(std::size_t x, std::size_t y) : x(x), y(y) {}
 
+bool operator<(const coord_t & c1, const coord_t & c2) {
+	if(c1.x == c2.x) return c1.y < c2.y;
+	return c1.x < c2.x;
+}
 
 dp_map_t::dp_map_t(std::size_t size, std::size_t nparticles, std::size_t num_readings)
 	: id_count(1), start_index(0)
 {
 	range_size = 360 / num_readings;
-	std::cout << "constructing dp_map object ";
+	//std::cout << "constructing dp_map object ";
 	grid.resize(size);
 	
 	for(std::size_t i = 0; i < grid.size(); ++i){
@@ -35,9 +39,9 @@ dp_map_t::dp_map_t(std::size_t size, std::size_t nparticles, std::size_t num_rea
 }
 
 void dp_map_t::update(const std::vector<double> & z_t, const control_t & u_t) {
-	std::cout << "transforming particles ";
+	//std::cout << "transforming particles ";
 	{
-		auto start = std::chrono::high_resolution_clock::now();
+		//auto start = std::chrono::high_resolution_clock::now();
 		std::vector<node_t*> transformed_particles(particles.size());
 		for(std::size_t i = 0; i < particles.size(); ++i) {
 			location_t x_t;
@@ -48,41 +52,41 @@ void dp_map_t::update(const std::vector<double> & z_t, const control_t & u_t) {
 		}
 	
 		std::swap(transformed_particles, particles);
-		auto end = std::chrono::high_resolution_clock::now();
-		std::cout << " time = " << (((double)(end - start).count()) / 1000000000.0) << "s, ";
+		//auto end = std::chrono::high_resolution_clock::now();
+		//std::cout << " time = " << (((double)(end - start).count()) / 1000000000.0) << "s, ";
 	}
 	
-	std::cout << "weighting particles ";
+	//std::cout << "weighting particles ";
 	{
-		auto start = std::chrono::high_resolution_clock::now();
+		//auto start = std::chrono::high_resolution_clock::now();
 		weight_particles(z_t);
-		auto end = std::chrono::high_resolution_clock::now();
-		std::cout << " time = " << (((double)(end - start).count()) / 1000000000.0) << "s, ";
+		//auto end = std::chrono::high_resolution_clock::now();
+		//std::cout << " time = " << (((double)(end - start).count()) / 1000000000.0) << "s, ";
 	}
 	
 	if((++start_index % range_size) == 0) {
 		start_index = 0;
-		std::cout << "resampling particles ";
-		auto start = std::chrono::high_resolution_clock::now();
+		//std::cout << "resampling particles ";
+		//auto start = std::chrono::high_resolution_clock::now();
 		resample();
-		auto end = std::chrono::high_resolution_clock::now();
-		std::cout << " time = " << (((double)(end - start).count()) / 1000000000.0) << "s, ";
+		//auto end = std::chrono::high_resolution_clock::now();
+		//std::cout << " time = " << (((double)(end - start).count()) / 1000000000.0) << "s, ";
 	}
 	else {
-		std::cout << "trimming tree ";
-		auto start = std::chrono::high_resolution_clock::now();
+		//std::cout << "trimming tree ";
+		//auto start = std::chrono::high_resolution_clock::now();
 		// Trim to condense parent nodes
 		for(node_t* particle : particles) {
 			particle->leaf = true;
 			particle->trim(*this);
 		}
-		auto end = std::chrono::high_resolution_clock::now();
-		std::cout << " time = " << (((double)(end - start).count()) / 1000000000.0) << "s, ";
+		//auto end = std::chrono::high_resolution_clock::now();
+		//std::cout << " time = " << (((double)(end - start).count()) / 1000000000.0) << "s, ";
 	}
 	
-	std::cout << "updating maps ";
+	//std::cout << "updating maps ";
 	{
-		auto start = std::chrono::high_resolution_clock::now();
+		//auto start = std::chrono::high_resolution_clock::now();
 		// Update range readings for each particle
 		unsigned int last_id = 0;
 		for(node_t* particle : particles) {
@@ -91,13 +95,13 @@ void dp_map_t::update(const std::vector<double> & z_t, const control_t & u_t) {
 			}
 			last_id = particle->id;
 		}
-		auto end = std::chrono::high_resolution_clock::now();
-		std::cout << " time = " << (((double)(end - start).count()) / 1000000000.0) << "s, ";
+		//auto end = std::chrono::high_resolution_clock::now();
+		//std::cout << " time = " << (((double)(end - start).count()) / 1000000000.0) << "s, ";
 	}
 }
 
 void dp_map_t::sample_map(std::vector<std::vector<int> > & map, location_t & location) {
-	std::cout << "sampling map ";
+	//std::cout << "sampling map ";
 	double r = rdist(random), c = weights.front();
 	double inv_size = 1.0 / (double) particles.size();
 	std::size_t i = 0, m = pdist(random);
@@ -167,21 +171,28 @@ void dp_map_t::resample() {
 
 void dp_map_t::rename(const coord_t & coord, unsigned int old_id, unsigned int new_id) {
 	grid[coord.x][coord.y][new_id] = grid[coord.x][coord.y][old_id];
-	grid[coord.x][coord.y].erase(grid[coord.x][coord.y].find(old_id));
+	grid[coord.x][coord.y].erase(old_id);
 }
 
 void dp_map_t::erase(const coord_t & coord, unsigned int id) {
 	grid[coord.x][coord.y].erase(grid[coord.x][coord.y].find(id));
 }
 
-int dp_map_t::occupied(const coord_t & coord, node_t* node) const {
+int dp_map_t::cell_count(const coord_t & coord, node_t* node) const {
 	do {
 		if(grid[coord.x][coord.y].count(node->id)) {
-			return (int)grid[coord.x][coord.y].at(node->id);
+			return grid[coord.x][coord.y].at(node->id);
 		}
 		node = node->parent;
 	} while(node != nullptr);
 	
+	return 0;
+}
+
+int dp_map_t::occupied(const coord_t & coord, node_t* node) const {
+	int value = cell_count(coord, node);
+	if(value > 0) return 1;
+	if(value < 0) return 0;
 	return -1;
 }
 
@@ -339,17 +350,20 @@ void dp_map_t::range_sensor_update(const location_t & begin, const location_t & 
 	for(; n > 0; --n) {
 		// Update grid cells seen through by this vector
 		if(y >= 0 && y < size() && x >= 0 && x < size()) {
-			int state = occupied(coord_t(x,y), node);
-			if(state == 1) return;
-			else if(state == -1) {
-				if(n > 1) {
-					grid[x][y][node->id] = false;
+			int value = cell_count(coord_t(x,y), node);
+			if(n > 1) {
+				if(value > -10) {
+					grid[x][y][node->id] = value - 1;
+					node->modified_cells.emplace(x, y);
 				}
-				else {
-					grid[x][y][node->id] = true;
-				}
-				node->modified_cells.push_back(coord_t(x, y));
 			}
+			else {
+				if(value < 10) {
+					grid[x][y][node->id] = value + 2;
+					node->modified_cells.emplace(x, y);
+				}
+			}
+			if(value > 0) return;
 		}
 		
 		// If we are are "below" the line, update y
@@ -400,10 +414,9 @@ void dp_map_t::node_t::trim(dp_map_t & map) {
 	else if(parent->children == 1 && parent->id != 0) {
 		for(const coord_t & cell : modified_cells) {
 			map.rename(cell, id, parent->id);
+			parent->modified_cells.insert(cell);
 		}
-		for(const coord_t & cell : parent->modified_cells) {
-			modified_cells.push_back(cell);
-		}
+		std::swap(modified_cells, parent->modified_cells);
 		id = parent->id;
 		
 		node_t* new_parent = parent->parent;

@@ -194,7 +194,7 @@ void slam_backend::read_network(const std::string &read_json)
 		json::Array depth_readings = return_json["lidar"]["depth"];
 		json::Object location = return_json["location"];
 		
-		double scale = 30;
+		double scale = 50;
 		
 		double x = location["x"].ToDouble() * 1000.0 / scale;
 		double y = location["y"].ToDouble() * 1000.0 / scale;
@@ -406,7 +406,7 @@ void init()
 
 int main(int argc, char *argv[])
 {
-	dp_map = dp_map_t(200, 500);
+	dp_map = dp_map_t(200, 300);
 	
 	occupancy_grid = std::vector<std::vector<int> >(dp_map.size());
 	for(std::size_t i = 0; i < dp_map.size(); ++i) {
