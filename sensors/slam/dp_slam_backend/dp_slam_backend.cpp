@@ -13,25 +13,27 @@
 #include <string>
 #include <vector>
 #include <sstream>
+#include <chrono>
 
 #ifdef _WIN32
 #include <stdint.h>  // for unit8-16 and whatnot
 #endif
 
 //String helper:
-#include "../../include/string_util.h"
+#include "../../../include/string_util.h"
 
 // Config file/cli read/write:
-#include "../../include/ini.h"
-#include "../../include/robot_config.h"
+#include "../../../include/ini.h"
+#include "../../../include/robot_config.h"
 
 // Network comms:
-#include "../../include/osl/time_function.h" // timing
-#include "../../include/osl/webservice.h" // web client
-#include "../../include/json.h" // JSON parsing ("super easy JSON" library)
+#include "../../../include/osl/time_function.h" // timing
+#include "../../../include/osl/webservice.h" // web client
+#include "../../../include/json.h" // JSON parsing ("super easy JSON" library)
 
 // Probabilistic occupancy map
-#include "occupancy_grid/occupancy_grid.h"
+#include "../dp_slam/dp_slam.h"
+#include "../dp_slam/motion.h"
 
 // Script execution
 #ifndef	_WIN32
@@ -39,16 +41,17 @@
 #endif
 
 /* Do linking right here */
-#include "../../include/ini.cpp"
-#include "../../include/robot_config.cpp"
-#include "../../include/string_util.cpp"
-#include "../../include/osl/socket.cpp"
-#include "../../include/osl/webservice.cpp"
-#include "../../include/json.cpp"
+#include "../../../include/ini.cpp"
+#include "../../../include/robot_config.cpp"
+#include "../../../include/string_util.cpp"
+#include "../../../include/osl/socket.cpp"
+#include "../../../include/osl/webservice.cpp"
+#include "../../../include/json.cpp"
 
-#include "occupancy_grid/occupancy_grid.cpp"
-#include "occupancy_grid/location.cpp"
-#include "occupancy_grid/angle.cpp"
+#include "../dp_slam/dp_slam.cpp"
+#include "../dp_slam/motion.cpp"
+#include "../mapping/location.cpp"
+#include "../mapping/angle.cpp"
 
 //OpenGL and GLUT includes
 #include <cstdlib>
@@ -60,7 +63,7 @@ using std::exit;
 #endif
 
 //Extra includes
-#include "graphics/bitmapprinter.h"
+#include "../graphics/bitmapprinter.h"
 
 #ifndef M_PI
 # define M_PI 3.1415926535897
@@ -85,9 +88,11 @@ void clean_exit(const char *why) {
 	exit(1);
 }
 
-occupancy_grid map;
-map_location baseLocation;
-map_location robotLocation;
+dp_map_t dp_map;
+std::vector<std::vector<int> > occupancy_grid;
+control_t odometry(location_t(0.0, 0.0, 0.0), location_t(0.0, 0.0, 0.0));
+location_t robot_location;
+bool initialized = false;
 
 /**
   Read commands from superstar, and send them to the robot.
@@ -189,32 +194,44 @@ void slam_backend::read_network(const std::string &read_json)
 		json::Array depth_readings = return_json["lidar"]["depth"];
 		json::Object location = return_json["location"];
 		
-		double scale = 25;
+		double scale = 30;
 		
 		double x = location["x"].ToDouble() * 1000.0 / scale;
 		double y = location["y"].ToDouble() * 1000.0 / scale;
 		double angle(location["angle"].ToDouble() / 180.0 * M_PI);
 		
-		map_location newLocation = baseLocation + map_location(x, y, angle);
+		location_t new_location(x, y, angle);
 		
-		if(std::abs(newLocation.get_direction() - robotLocation.get_direction()) < 0.005){
-			std::vector<double> converted_depth_readings;
-		
-			for(auto & depth : depth_readings)
-			{
-				converted_depth_readings.push_back(depth.ToDouble() / scale);
-			}
-			
-			try {
-				map.update(newLocation, converted_depth_readings);
-			}
-			catch(std::exception& error)
-			{
-				std::cout<<"Error! "<<error.what()<<std::endl;
-			}
+		if(!initialized) {
+			odometry = control_t(new_location, new_location);
+			initialized = true;
+		}
+		else {
+			location_t old_location = odometry.current();
+			odometry = control_t(new_location, old_location);
 		}
 		
-		robotLocation = newLocation;
+		//std::cout << "last x = " << odometry.last().get_x() << ", y = " << odometry.last().get_y() << ", theta = " << odometry.last().get_direction() << "\n";
+		//std::cout << "current x = " << odometry.current().get_x() << ", y = " << odometry.current().get_y() << ", theta = " << odometry.current().get_direction() << "\n";
+		
+		std::vector<double> converted_depth_readings;
+		
+		for(auto & depth : depth_readings)
+		{
+			converted_depth_readings.push_back(depth.ToDouble() / scale);
+		}
+		
+		try {
+			auto start = std::chrono::high_resolution_clock::now();
+			dp_map.update(converted_depth_readings, odometry);
+			dp_map.sample_map(occupancy_grid, robot_location);
+			auto end = std::chrono::high_resolution_clock::now();
+			std::cout << "Time = " << (((double)(end - start).count()) / 1000000000.0) << "s\n";
+		}
+		catch(std::exception& error)
+		{
+			std::cout<<"Error! "<<error.what()<<std::endl;
+		}
 		
 		//std::cout << depth_readings.size() << "\n";
 
@@ -234,12 +251,12 @@ slam_backend *backend=NULL; // Slam backend object for communication with supers
 const int ESCKEY = 27;         // ASCII value of Escape
 
 const int START_WIN_SIZE = 1000;  // Start window width & height (pixels)
-const int PULLS_PER_SECOND = 5;
+const int PULLS_PER_SECOND = 10;
 
 double savetime;               // Time of previous movement (sec)
 
 // Draws the occupancy map as a grid of filled squares
-void drawGrid(const occupancy_grid & map)
+void drawGrid(const std::vector<std::vector<int> > & map)
 {
 	glPushMatrix();
 	glBegin(GL_QUADS);
@@ -247,7 +264,11 @@ void drawGrid(const occupancy_grid & map)
 	{
 		for(std::size_t x = 0; x < map.size(); x++)
 		{
-			double weight = 1.0 - map(x,y-1);
+			double weight;
+			if(map[x][y] == -1) weight = 0.5;
+			else if(map[x][y] == 0) weight = 1.0;
+			else weight = 0.0;
+			
 			glColor3f(weight, weight, weight);
 			glVertex2d(-1.0 + x, -1.0 + y);
 			glVertex2d( 1.0 + x, -1.0 + y);
@@ -260,7 +281,7 @@ void drawGrid(const occupancy_grid & map)
 }
 
 // Draws the robot as a simple triangle oriented as the robot is
-void drawRobot(const map_location & robot)
+void drawRobot(const location_t & robot)
 {
 	glPushMatrix();
 	double x = robot.get_x();
@@ -289,9 +310,9 @@ void myDisplay()
 	// Draw map and robot in a 2x2 square centered at the origin
 	glPushMatrix();
 	glTranslated(-1.0, -1.0, 0.);   // Translate to center our grid
-	glScaled(2.0/(double)map.size(), 2.0/(double)map.size(), 1.0);  // Scale grid to 2x2 square
-	drawGrid(map);
-	drawRobot(robotLocation);
+	glScaled(2.0/(double)occupancy_grid.size(), 2.0/(double)occupancy_grid.size(), 1.0);  // Scale grid to 2x2 square
+	drawGrid(occupancy_grid);
+	drawRobot(robot_location);
 	glPopMatrix();
 
 	// Draw documentation
@@ -320,6 +341,7 @@ void myIdle()
 	if(elapsedtime > 1.0/PULLS_PER_SECOND)
 	{
 		savetime = currtime;
+		
 		// Pull network and redisplay
 		try
 		{
@@ -351,33 +373,32 @@ void myKeyboard(unsigned char key, int x, int y)
 // Initialize GL states and global data
 void init()
 {
-	//init opengl
+	// Init opengl
 	int i = 0;
 	char * c;
 	glutInit(&i,&c);
 	glutInitDisplayMode(GLUT_DOUBLE | GLUT_RGB);
 
-	//generate window
+	// Generate window
 	glutInitWindowSize(START_WIN_SIZE, START_WIN_SIZE);
 	glutInitWindowPosition(50, 50);
 	glutCreateWindow("Robot Mapping");	
 	
-	//timing
+	// Timing
 	savetime = glutGet(GLUT_ELAPSED_TIME) / 1000.;
 
-	//transformation stuff
+	// Transformation stuff
 	glMatrixMode(GL_PROJECTION);
 	glLoadIdentity();
 	gluOrtho2D(-1., 1., -1., 1.);
 
-	//return to model/view mode
+	// Return to model/view mode
 	glMatrixMode(GL_MODELVIEW);
 	
 	glutDisplayFunc(myDisplay);
 	glutIdleFunc(myIdle);
 	glutKeyboardFunc(myKeyboard);
 
-	//the loop
 	glutMainLoop();
 }
 
@@ -385,9 +406,14 @@ void init()
 
 int main(int argc, char *argv[])
 {
-	map = occupancy_grid(300, 0.5, 0.4, 0.8);
-	baseLocation = map_location(map.size()/2, map.size()/2, 0.0);
-	robotLocation = map_location(map.size()/2, map.size()/2, 0.0);
+	dp_map = dp_map_t(200, 500);
+	
+	occupancy_grid = std::vector<std::vector<int> >(dp_map.size());
+	for(std::size_t i = 0; i < dp_map.size(); ++i) {
+		for(std::size_t j = 0; j < dp_map.size(); ++j) {
+			occupancy_grid[i].push_back(-1);
+		}
+	}
 	
 	try
 	{

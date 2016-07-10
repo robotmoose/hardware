@@ -1,0 +1,8 @@
+robot=2016/uaf/aven_test_bot
+superstar=http://localhost:8081
+#baudrate=57600
+#marker=
+trim=0.85
+#debug=
+delay_ms=100
+#sim=false

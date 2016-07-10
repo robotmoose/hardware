@@ -37,10 +37,10 @@ std::size_t occupancy_grid::size() const
 	return grid.size();
 }
 
-void occupancy_grid::update(const map_location & xt, const std::vector<double> & zt)
+void occupancy_grid::update(const location_t & xt, const std::vector<double> & zt)
 {
-	angle direction = 0.0;
-	angle delta = 2.0 * M_PI / zt.size();	
+	angle_t direction = 0.0;
+	angle_t delta = 2.0 * M_PI / zt.size();	
 	
 	for(std::size_t i = 0; i < zt.size(); i++)
 	{
@@ -48,7 +48,7 @@ void occupancy_grid::update(const map_location & xt, const std::vector<double> &
 		if(zt[i] != 0.0)
 		{
 			try{
-				range_sensor_update(xt, map_location(xt, zt[i], direction));
+				range_sensor_update(xt, location_t(xt, zt[i], direction));
 			}
 			catch(std::exception & error)
 			{
@@ -60,7 +60,7 @@ void occupancy_grid::update(const map_location & xt, const std::vector<double> &
 	//std::cout << "\n";
 }
 
-void occupancy_grid::range_sensor_update(const map_location & begin, const map_location & end)
+void occupancy_grid::range_sensor_update(const location_t & begin, const location_t & end)
 {
 	double x0 = begin.get_x();
 	double y0 = begin.get_y(); 
