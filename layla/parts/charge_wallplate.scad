@@ -48,7 +48,7 @@ module wallplate_screwholes()
 
 module wallplate_wirehole() 
 {
-	translate([wallplate_plexi_x/2,0]) circle(d=40);
+	translate([wallplate_plexi_x/2,0]) circle(d=65);
 }
 
 // Whole plate
