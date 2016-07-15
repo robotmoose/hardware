@@ -63,7 +63,6 @@ int main() {
 	printGccphatResult(max_corr_pair_23, 2, 3, FS);
 	// ***** End DSP Section ***** //
 
-
 	// Benchmark gccphat
 	std::uint64_t avg = 0;
 	std::uint32_t numiters = 1000;
@@ -74,20 +73,6 @@ int main() {
 		avg += std::chrono::duration_cast<std::chrono::nanoseconds>(end-begin).count();
 	}
 	std::cout << avg/numiters << " ns (Average of " << numiters << " iterations)" << std::endl;
-
-	// // Find the maximum correlation and the associated lag
-	// std::pair<double, int> max_corr_pair = std::make_pair(result[0][0],-NUMSAMPLES_FFT+1); // store max corr at first, corresponding lag at second
-	// for(int i=0; i<2*NUMSAMPLES_FFT-1; ++i) {
-	// 	if(result[i][0] > max_corr_pair.first) {
-	// 		max_corr_pair.first = result[i][0];
-	// 		max_corr_pair.second = i-NUMSAMPLES_FFT+1; 
-	// 	}
-	// 	output << result[i][0] << "," << i-NUMSAMPLES_FFT+1 << std::endl;
-	// }
-	// std::cout << "Max correlation is " << max_corr_pair.first << " at a lag of " << max_corr_pair.second << std::endl;
-	// if(max_corr_pair.second>0) std::cout << "Thus, signal a leads signal b by " << max_corr_pair.second/FS << " seconds\n";
-	// else if(max_corr_pair.second<0) std::cout << "Thus, signal a lags signal b by " << max_corr_pair.second/FS << " seconds\n";
-	// else std::cout << "Thus, signals a and b are fully synchronized\n";
 
 	// Clean up
 	fftw_free(signal1);

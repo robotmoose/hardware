@@ -84,21 +84,23 @@ std::pair<double, int> gccphat(fftw_complex * signala, fftw_complex * signalb, f
     memcpy (signalb_ext, signalb, sizeof(fftw_complex) * N);
     memset (signalb_ext + N, 0, sizeof(fftw_complex) * (N - 1));
 
+    // Take the fft of the two input signals.
     fftw_execute_dft(gccphat_manager -> fft, signala_ext, outa);
     fftw_execute_dft(gccphat_manager -> fft, signalb_ext, outb);
 
 
    // double scale = 1.0/(2 * N -1);
+    // Reinterpret pointers for compatibility with std::conj & std:abs in <complex>
     std::complex<double> * out_cmplx = reinterpret_cast<std::complex<double> *>(out);
     std::complex<double> * outa_cmplx = reinterpret_cast<std::complex<double> *>(outa);
     std::complex<double> * outb_cmplx = reinterpret_cast<std::complex<double> *>(outb);
 
     for (int i = 0; i < 2 * N - 1; i++)
-        out_cmplx[i] = outa_cmplx[i] * conj(outb_cmplx[i])/(abs(outa_cmplx[i] * conj(outb_cmplx[i])));
-    // *****
+        out_cmplx[i] = outa_cmplx[i] * std::conj(outb_cmplx[i])/(std::abs(outa_cmplx[i] * std::conj(outb_cmplx[i])));
 
     fftw_execute_dft(gccphat_manager -> ifft, out, result);
 
+    // Find the sample offset where the maximum correlation occurs.
     std::pair<double, int> max_corr_pair = std::make_pair(result[0][0],-N+1);
     for(int i=0; i<2*N-1; ++i) {
         if(result[i][0] > max_corr_pair.first) {
