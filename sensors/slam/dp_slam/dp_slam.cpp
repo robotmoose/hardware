@@ -18,7 +18,7 @@ dp_map_t::dp_map_t(std::size_t size, std::size_t nparticles, std::size_t num_rea
 	: id_count(1), start_index(0)
 {
 	range_size = 360 / num_readings;
-	//std::cout << "constructing dp_map object ";
+	std::cout << "constructing dp_map object ";
 	grid.resize(size);
 	
 	for(std::size_t i = 0; i < grid.size(); ++i){
@@ -39,9 +39,9 @@ dp_map_t::dp_map_t(std::size_t size, std::size_t nparticles, std::size_t num_rea
 }
 
 void dp_map_t::update(const std::vector<double> & z_t, const control_t & u_t) {
-	//std::cout << "transforming particles ";
+	std::cout << "transforming particles ";
 	{
-		//auto start = std::chrono::high_resolution_clock::now();
+		auto start = std::chrono::high_resolution_clock::now();
 		std::vector<node_t*> transformed_particles(particles.size());
 		for(std::size_t i = 0; i < particles.size(); ++i) {
 			location_t x_t;
@@ -52,56 +52,56 @@ void dp_map_t::update(const std::vector<double> & z_t, const control_t & u_t) {
 		}
 	
 		std::swap(transformed_particles, particles);
-		//auto end = std::chrono::high_resolution_clock::now();
-		//std::cout << " time = " << (((double)(end - start).count()) / 1000000000.0) << "s, ";
+		auto end = std::chrono::high_resolution_clock::now();
+		std::cout << " time = " << (((double)(end - start).count()) / 1000000000.0) << "s, ";
 	}
 	
-	//std::cout << "weighting particles ";
+	std::cout << "weighting particles ";
 	{
-		//auto start = std::chrono::high_resolution_clock::now();
+		auto start = std::chrono::high_resolution_clock::now();
 		weight_particles(z_t);
-		//auto end = std::chrono::high_resolution_clock::now();
-		//std::cout << " time = " << (((double)(end - start).count()) / 1000000000.0) << "s, ";
+		auto end = std::chrono::high_resolution_clock::now();
+		std::cout << " time = " << (((double)(end - start).count()) / 1000000000.0) << "s, ";
 	}
 	
 	if((++start_index % range_size) == 0) {
 		start_index = 0;
-		//std::cout << "resampling particles ";
-		//auto start = std::chrono::high_resolution_clock::now();
+		std::cout << "resampling particles ";
+		auto start = std::chrono::high_resolution_clock::now();
 		resample();
-		//auto end = std::chrono::high_resolution_clock::now();
-		//std::cout << " time = " << (((double)(end - start).count()) / 1000000000.0) << "s, ";
+		auto end = std::chrono::high_resolution_clock::now();
+		std::cout << " time = " << (((double)(end - start).count()) / 1000000000.0) << "s, ";
 	}
 	else {
-		//std::cout << "trimming tree ";
-		//auto start = std::chrono::high_resolution_clock::now();
+		std::cout << "trimming tree ";
+		auto start = std::chrono::high_resolution_clock::now();
 		// Trim to condense parent nodes
 		for(node_t* particle : particles) {
 			particle->leaf = true;
 			particle->trim(*this);
 		}
-		//auto end = std::chrono::high_resolution_clock::now();
-		//std::cout << " time = " << (((double)(end - start).count()) / 1000000000.0) << "s, ";
+		auto end = std::chrono::high_resolution_clock::now();
+		std::cout << " time = " << (((double)(end - start).count()) / 1000000000.0) << "s, ";
 	}
 	
-	//std::cout << "updating maps ";
+	std::cout << "updating maps ";
 	{
-		//auto start = std::chrono::high_resolution_clock::now();
+		auto start = std::chrono::high_resolution_clock::now();
 		// Update range readings for each particle
 		unsigned int last_id = 0;
-		for(node_t* particle : particles) {
-			if(particle->id != last_id) {
-				update_node(z_t, particle);
+		for(std::size_t i = 0; i < particles.size(); ++i) {
+			if(weights[i] > (0.001 / (double) particles.size()) && particles[i]->id != last_id) {
+				update_node(z_t, particles[i]);
+				last_id = particles[i]->id;
 			}
-			last_id = particle->id;
 		}
-		//auto end = std::chrono::high_resolution_clock::now();
-		//std::cout << " time = " << (((double)(end - start).count()) / 1000000000.0) << "s, ";
+		auto end = std::chrono::high_resolution_clock::now();
+		std::cout << " time = " << (((double)(end - start).count()) / 1000000000.0) << "s, ";
 	}
 }
 
 void dp_map_t::sample_map(std::vector<std::vector<int> > & map, location_t & location) {
-	//std::cout << "sampling map ";
+	std::cout << "sampling map ";
 	double r = rdist(random), c = weights.front();
 	double inv_size = 1.0 / (double) particles.size();
 	std::size_t i = 0, m = pdist(random);
@@ -129,8 +129,12 @@ void dp_map_t::weight_particles(const std::vector<double> & z_t)
 {
 	double psum = 0.0;
 	for(std::size_t i = 0; i < weights.size(); ++i) {
-		double p = range_model(z_t, particles[i]);
-		weights[i] *= p;
+		if(weights[i] > (0.001 / (double) particles.size())) {
+			weights[i] *= range_model(z_t, particles[i]);
+		}
+		else {
+			weights[i] = 0;
+		}
 		psum += weights[i];
 	}
 	
@@ -206,9 +210,9 @@ double dp_map_t::range_model(const std::vector<double> & z_t, node_t* node) cons
 		if(z_t[i] != 0.0) {
 			double z_ei = cast_ray(direction, node);
 			if(z_ei >= 0.0) {
-				double p = (1 / (std::sqrt(2 * M_PI * 25.0))) *
-					std::exp(-0.5 * std::pow((z_t[i] - z_ei), 2) / 25.0) / 0.08;
-				q *= p;
+				double p = (1 / (std::sqrt(2 * M_PI * 9.0))) *
+					std::exp(-0.5 * std::pow((z_t[i] - z_ei), 2) / 9.0) / 0.08;
+				q *= std::max(p, 0.01);
 			}
 		}
 		direction -= (delta * range_size);
@@ -224,6 +228,7 @@ double dp_map_t::cast_ray(angle_t direction, node_t* node) const {
 	double x0 = begin.get_x(), y0 = begin.get_y(); 
 	double x1 = end.get_x(), y1 = end.get_y();
 	double dx = fabs(x1 - x0), dy = fabs(y1 - y0);
+	if(dx < 2.0 && dy < 2.0) return -1.0;
 
 	std::size_t x = floor(x0), y = floor(y0);
 	std::size_t n = 1;
@@ -285,7 +290,7 @@ double dp_map_t::cast_ray(angle_t direction, node_t* node) const {
 		}
 	}
 	
-	return -1.0;
+	return 100.0;
 }
 
 void dp_map_t::update_node(const std::vector<double> & z_t, node_t* node)
@@ -310,6 +315,7 @@ void dp_map_t::range_sensor_update(const location_t & begin, const location_t & 
 	double x0 = begin.get_x(), y0 = begin.get_y(); 
 	double x1 = end.get_x(), y1 = end.get_y();
 	double dx = fabs(x1 - x0), dy = fabs(y1 - y0);
+	if(dx < 2.0 && dy < 2.0) return;
 
 	std::size_t x = floor(x0), y = floor(y0);
 	std::size_t n = 1;
@@ -352,18 +358,25 @@ void dp_map_t::range_sensor_update(const location_t & begin, const location_t & 
 		if(y >= 0 && y < size() && x >= 0 && x < size()) {
 			int value = cell_count(coord_t(x,y), node);
 			if(n > 1) {
-				if(value > -10) {
+				if(value == 0) {
+					grid[x][y][node->id] = value - 20;
+					node->modified_cells.emplace(x, y);
+				}
+				else if(value > -20) {
 					grid[x][y][node->id] = value - 1;
 					node->modified_cells.emplace(x, y);
 				}
 			}
 			else {
-				if(value < 10) {
+				if(value == 0) {
+					grid[x][y][node->id] = value + 20;
+					node->modified_cells.emplace(x, y);
+				}
+				else if(value < 20) {
 					grid[x][y][node->id] = value + 2;
 					node->modified_cells.emplace(x, y);
 				}
 			}
-			if(value > 0) return;
 		}
 		
 		// If we are are "below" the line, update y

@@ -173,7 +173,7 @@ void slam_backend::do_network()
 {
 	//std::cout << "\033[2J\033[1;1H"; // clear screen	
 	//std::cout<<"Robot name: "<<robotName<<"\n";
-
+	//std::cout << "read network ";
 	std::string read_path="robots/"+robotName+"/sensors";
 	std::string read_json=superstar_send_get("/superstar/"+read_path+"?get");	//+request);
 
@@ -194,7 +194,9 @@ void slam_backend::read_network(const std::string &read_json)
 		json::Array depth_readings = return_json["lidar"]["depth"];
 		json::Object location = return_json["location"];
 		
-		double scale = 50;
+		//std::cout << "parsed JSON ";
+		
+		double scale = 100;
 		
 		double x = location["x"].ToDouble() * 1000.0 / scale;
 		double y = location["y"].ToDouble() * 1000.0 / scale;
@@ -210,6 +212,7 @@ void slam_backend::read_network(const std::string &read_json)
 			location_t old_location = odometry.current();
 			odometry = control_t(new_location, old_location);
 		}
+		//std::cout << "computed odometry ";
 		
 		//std::cout << "last x = " << odometry.last().get_x() << ", y = " << odometry.last().get_y() << ", theta = " << odometry.last().get_direction() << "\n";
 		//std::cout << "current x = " << odometry.current().get_x() << ", y = " << odometry.current().get_y() << ", theta = " << odometry.current().get_direction() << "\n";
@@ -220,6 +223,7 @@ void slam_backend::read_network(const std::string &read_json)
 		{
 			converted_depth_readings.push_back(depth.ToDouble() / scale);
 		}
+		//std::cout << "converted depth readings ";
 		
 		try {
 			auto start = std::chrono::high_resolution_clock::now();
@@ -251,7 +255,7 @@ slam_backend *backend=NULL; // Slam backend object for communication with supers
 const int ESCKEY = 27;         // ASCII value of Escape
 
 const int START_WIN_SIZE = 1000;  // Start window width & height (pixels)
-const int PULLS_PER_SECOND = 10;
+const int PULLS_PER_SECOND = 5;
 
 double savetime;               // Time of previous movement (sec)
 
@@ -406,7 +410,7 @@ void init()
 
 int main(int argc, char *argv[])
 {
-	dp_map = dp_map_t(200, 300);
+	dp_map = dp_map_t(500, 1000, 12);
 	
 	occupancy_grid = std::vector<std::vector<int> >(dp_map.size());
 	for(std::size_t i = 0; i < dp_map.size(); ++i) {
