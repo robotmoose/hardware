@@ -1,0 +1,32 @@
+Performing C++ SOURCE FILE Test COMPILER_SUPPORTS_CXX11 succeded with the following output:
+Change Dir: /home/ryker/Documents/GitHub/robotmoose/hardware/sensors/sound_localize/software/kinect_localize/bin/CMakeFiles/CMakeTmp
+
+Run Build Command:/usr/bin/make "cmTryCompileExec3857643541/fast"
+/usr/bin/make -f CMakeFiles/cmTryCompileExec3857643541.dir/build.make CMakeFiles/cmTryCompileExec3857643541.dir/build
+make[1]: Entering directory `/home/ryker/Documents/GitHub/robotmoose/hardware/sensors/sound_localize/software/kinect_localize/bin/CMakeFiles/CMakeTmp'
+/usr/bin/cmake -E cmake_progress_report /home/ryker/Documents/GitHub/robotmoose/hardware/sensors/sound_localize/software/kinect_localize/bin/CMakeFiles/CMakeTmp/CMakeFiles 1
+Building CXX object CMakeFiles/cmTryCompileExec3857643541.dir/src.cxx.o
+/usr/bin/c++    -DCOMPILER_SUPPORTS_CXX11   -std=c++11 -o CMakeFiles/cmTryCompileExec3857643541.dir/src.cxx.o -c /home/ryker/Documents/GitHub/robotmoose/hardware/sensors/sound_localize/software/kinect_localize/bin/CMakeFiles/CMakeTmp/src.cxx
+Linking CXX executable cmTryCompileExec3857643541
+/usr/bin/cmake -E cmake_link_script CMakeFiles/cmTryCompileExec3857643541.dir/link.txt --verbose=1
+/usr/bin/c++    -DCOMPILER_SUPPORTS_CXX11    CMakeFiles/cmTryCompileExec3857643541.dir/src.cxx.o  -o cmTryCompileExec3857643541 -rdynamic 
+make[1]: Leaving directory `/home/ryker/Documents/GitHub/robotmoose/hardware/sensors/sound_localize/software/kinect_localize/bin/CMakeFiles/CMakeTmp'
+
+Source file was:
+int main() { return 0;}
+Performing C++ SOURCE FILE Test COMPILER_SUPPORTS_CXX0X succeded with the following output:
+Change Dir: /home/ryker/Documents/GitHub/robotmoose/hardware/sensors/sound_localize/software/kinect_localize/bin/CMakeFiles/CMakeTmp
+
+Run Build Command:/usr/bin/make "cmTryCompileExec464526200/fast"
+/usr/bin/make -f CMakeFiles/cmTryCompileExec464526200.dir/build.make CMakeFiles/cmTryCompileExec464526200.dir/build
+make[1]: Entering directory `/home/ryker/Documents/GitHub/robotmoose/hardware/sensors/sound_localize/software/kinect_localize/bin/CMakeFiles/CMakeTmp'
+/usr/bin/cmake -E cmake_progress_report /home/ryker/Documents/GitHub/robotmoose/hardware/sensors/sound_localize/software/kinect_localize/bin/CMakeFiles/CMakeTmp/CMakeFiles 1
+Building CXX object CMakeFiles/cmTryCompileExec464526200.dir/src.cxx.o
+/usr/bin/c++    -DCOMPILER_SUPPORTS_CXX0X   -std=c++0x -o CMakeFiles/cmTryCompileExec464526200.dir/src.cxx.o -c /home/ryker/Documents/GitHub/robotmoose/hardware/sensors/sound_localize/software/kinect_localize/bin/CMakeFiles/CMakeTmp/src.cxx
+Linking CXX executable cmTryCompileExec464526200
+/usr/bin/cmake -E cmake_link_script CMakeFiles/cmTryCompileExec464526200.dir/link.txt --verbose=1
+/usr/bin/c++    -DCOMPILER_SUPPORTS_CXX0X    CMakeFiles/cmTryCompileExec464526200.dir/src.cxx.o  -o cmTryCompileExec464526200 -rdynamic 
+make[1]: Leaving directory `/home/ryker/Documents/GitHub/robotmoose/hardware/sensors/sound_localize/software/kinect_localize/bin/CMakeFiles/CMakeTmp'
+
+Source file was:
+int main() { return 0;}
