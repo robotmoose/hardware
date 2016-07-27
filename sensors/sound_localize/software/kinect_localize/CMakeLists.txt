@@ -1,8 +1,6 @@
 cmake_minimum_required (VERSION 2.8)
 project(Sound_Localize_Kinect)
 
-set(CMAKE_BINARY_DIR ${CMAKE_SOURCE_DIR}/bin)
-
 # Require C++11
 include(CheckCXXCompilerFlag)
 CHECK_CXX_COMPILER_FLAG("-std=c++11" COMPILER_SUPPORTS_CXX11)

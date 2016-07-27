@@ -2,21 +2,43 @@
 #include <stdint.h> // for int32_t
 #include <utility> // for std::pair
 #include <cstring> // for memset and memcpy.
+#include <fstream>
+#include <string>
 
-std::pair<int32_t, int32_t> xcor_td(int32_t * signal1, int32_t * signal2, const int & NUMSAMPLES_XCOR, const int & XCOR_WIDTH) {
+std::pair<int64_t, int32_t> xcor_td(int32_t * signal1, int32_t * signal2, const int & NUMSAMPLES_XCOR, const int & XCOR_WIDTH) {
+	
+	// Output to files for debugging
+	 std::ofstream sig1, sig2, sig2_ext, xcor;
+	// sig1.open("sig1.csv");
+	// sig2.open("sig2.csv");
+	// sig2_ext.open("sig2_ext.csv");
+	 xcor.open("xcor.csv");
+
+	// for(int i=0; i<NUMSAMPLES_XCOR; ++i) {
+	// 	sig1 << std::to_string(signal1[i]) << "\n";
+	// }
+	// for(int i=0; i<NUMSAMPLES_XCOR; ++i) {
+	// 	sig2 << std::to_string(signal2[i]) << "\n";
+	// }
+
 	// Zero-pad the second input signal
 	int32_t * signal2_ext = new int32_t [NUMSAMPLES_XCOR+XCOR_WIDTH];
 	memset(signal2_ext, 0, XCOR_WIDTH/2*sizeof(int32_t));
 	memcpy(signal2_ext+XCOR_WIDTH/2, signal2, NUMSAMPLES_XCOR*sizeof(int32_t));
 	memset(signal2_ext+XCOR_WIDTH/2+NUMSAMPLES_XCOR, 0, XCOR_WIDTH/2*sizeof(int32_t));
 
+	// for(int i=0; i<NUMSAMPLES_XCOR+XCOR_WIDTH; ++i) {
+	// 	sig2_ext << std::to_string(signal2_ext[i]) << "\n";
+	// }
+
 	// Calculate the correlation of the signals
-	std::pair<int32_t, int32_t> xcor_results(0,0);
+	std::pair<int64_t, int32_t> xcor_results(0,0);
 	for(int i=0; i<XCOR_WIDTH; ++i) {
-		int32_t sum;
+		int64_t sum=0;
 		for(int j=0; j<NUMSAMPLES_XCOR; ++j) {
-			sum += signal1[j] * signal2_ext[j];
+			sum += (int64_t)signal1[j] * (int64_t)signal2_ext[j];
 		}
+		// xcor << std::to_string(sum) << "\n";
 		if(xcor_results.first < sum) {
 			xcor_results.first = sum;
 			// Signal is sliding backwards so lag is negative
@@ -24,5 +46,6 @@ std::pair<int32_t, int32_t> xcor_td(int32_t * signal1, int32_t * signal2, const 
 		}
 		++signal2_ext;
 	}
-	delete [] signal2_ext;
+	delete [] (signal2_ext-XCOR_WIDTH);
+	return xcor_results;
 }

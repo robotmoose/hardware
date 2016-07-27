@@ -44,6 +44,14 @@
 #endif
 
 #include "xcor_td.h"
+#include <cmath>
+#include <vector>
+#include <utility>
+#include <algorithm>
+#include <deque>
+
+#include <fstream>
+std::ofstream myfile;
 
 pthread_t freenect_thread;
 volatile int die = 0;
@@ -62,13 +70,28 @@ capture state;
 
 // Approximate linear coordinates of the Kinect's built in microphones relative to the RGB camera's position (in meters).
 //     Source: http://www.mathworks.com/help/audio/examples/live-direction-of-arrival-estimation-with-a-linear-microphone-array.html
-const double MIC_POSITIONS[4] = {-0.088, 0.042, 0.078, 0.11};
+//const double MIC_POSITIONS[4] = {-0.088, 0.042, 0.078, 0.11};
 
+//     Source: http://giampierosalvi.blogspot.com/2013/12/ms-kinect-microphone-array-geometry.html
+const double MIC_POSITIONS[4] = {0.113, -0.036, -.076, -0.113};
+
+const double SOUND_SPEED = 343.0; // Sound speed in meters per second.
 const double SAMPLE_FREQUENCY = 16000.0; // 16 kHz per channel.
 const int NUMSAMPLES_XCOR = 256*32; // Width of the sliding window.
 // Since microphones are so close together, only need to compute the xcor near the center of the window.
-const int XCOR_WIDTH = 128;
- 
+const int XCOR_WIDTH = 32;
+int xcor_counter = 0; // Counts up to NUMSAMPLES_XCOR/2 to trigger xcor. 
+
+// Create arrays to store microphone data for xcor. This allows us to collect data and do calculations simultaneously.
+int32_t ** xcor_data = new int32_t* [4];
+
+int32_t sig1[256*16];
+int32_t sig2[256*16];
+
+std::deque<int32_t> mic1_d;
+std::deque<int32_t> mic2_d;
+std::deque<int32_t> mic3_d;
+std::deque<int32_t> mic4_d;
 
 int paused = 0;
 
@@ -77,12 +100,72 @@ pthread_cond_t audiobuf_cond = PTHREAD_COND_INITIALIZER;
 
 int win_h, win_w;
 
+double findAngle() {
+	double angle = 0;
+	std::vector<std::pair<int32_t,double>> lags_and_x;
+	lags_and_x.reserve(8);
+	std::vector<double> angles;
+
+	// Determine the lags between the microphone pairs.
+	lags_and_x.push_back(std::make_pair(xcor_td(xcor_data[0], xcor_data[1], NUMSAMPLES_XCOR, XCOR_WIDTH).second, fabs(MIC_POSITIONS[0]-MIC_POSITIONS[1])));
+	lags_and_x.push_back(std::make_pair(xcor_td(xcor_data[0], xcor_data[2], NUMSAMPLES_XCOR, XCOR_WIDTH).second, fabs(MIC_POSITIONS[0]-MIC_POSITIONS[2])));
+	lags_and_x.push_back(std::make_pair(xcor_td(xcor_data[0], xcor_data[3], NUMSAMPLES_XCOR, XCOR_WIDTH).second, fabs(MIC_POSITIONS[0]-MIC_POSITIONS[3])));
+	lags_and_x.push_back(std::make_pair(xcor_td(xcor_data[1], xcor_data[2], NUMSAMPLES_XCOR, XCOR_WIDTH).second, fabs(MIC_POSITIONS[1]-MIC_POSITIONS[2])));
+	lags_and_x.push_back(std::make_pair(xcor_td(xcor_data[1], xcor_data[3], NUMSAMPLES_XCOR, XCOR_WIDTH).second, fabs(MIC_POSITIONS[1]-MIC_POSITIONS[3])));
+	lags_and_x.push_back(std::make_pair(xcor_td(xcor_data[2], xcor_data[3], NUMSAMPLES_XCOR, XCOR_WIDTH).second, fabs(MIC_POSITIONS[2]-MIC_POSITIONS[3])));
+
+	for(int i=0; i<6; ++i) {
+		angles.push_back(-asin(lags_and_x[i].first*SOUND_SPEED/(SAMPLE_FREQUENCY*lags_and_x[i].second))*180.0/M_PI);
+		//printf("%f\n", -asin(lags_and_x[i].first*SOUND_SPEED/(SAMPLE_FREQUENCY*lags_and_x[i].second))*180.0/M_PI);
+		//printf("angle %d: %f\n", i, angles[i]);
+	}
+	//std::sort(angles.begin(), angles.end());
+	// for(int i=0; i<6; ++i) {
+	// 	printf("angle %d: %f\n", i, angles[i]);
+	// }
+
+	for(int i=0; i<5; ++i) {
+		printf("lag %d: %d\n", i, lags_and_x[i].first);
+	}
+	// Determine the median lag
+	// std::sort(lags_and_x.begin(), lags_and_x.end(), [](const std::pair<int32_t,double> &a, const std::pair<int32_t, double> & b) {
+	// 	return b.first < a.first;
+	// });
+	//angle = -asin(lags_and_x[3].first*SOUND_SPEED/(SAMPLE_FREQUENCY*lags_and_x[3].second))*180/M_PI;
+
+
+	//angles[0] = -asin(lags[0]*SOUND_SPEED/(SAMPLE_FREQUENCY*(MIC_POSITIONS[0]-MIC_POSITIONS[1])))*180/M_PI;
+
+
+	return angles[3];
+}
+
 void in_callback(freenect_device* dev, int num_samples,
                  int32_t* mic1, int32_t* mic2,
                  int32_t* mic3, int32_t* mic4,
                  int16_t* cancelled, void *unknown) {
 	pthread_mutex_lock(&audiobuf_mutex);
 	capture* c = (capture*)freenect_get_user(dev);
+	if(mic1_d.size() < NUMSAMPLES_XCOR) {
+		for(int i=0; i<num_samples; ++i) {
+			mic1_d.push_back(mic1[i]);
+			mic2_d.push_back(mic2[i]);
+			mic3_d.push_back(mic3[i]);
+			mic4_d.push_back(mic4[i]);
+		}
+	}
+	else {
+		for(int i=0; i<num_samples; ++i) {
+			mic1_d.push_back(mic1[i]);
+			mic1_d.pop_front();
+			mic2_d.push_back(mic2[i]);
+			mic2_d.pop_front();
+			mic3_d.push_back(mic3[i]);
+			mic3_d.pop_front();
+			mic4_d.push_back(mic4[i]);
+			mic4_d.pop_front();
+		}
+	}
 	if(num_samples < c->max_samples - c->current_idx) {
 		memcpy(&(c->buffers[0][c->current_idx]), mic1, num_samples*sizeof(int32_t));
 		memcpy(&(c->buffers[1][c->current_idx]), mic2, num_samples*sizeof(int32_t));
@@ -102,9 +185,48 @@ void in_callback(freenect_device* dev, int num_samples,
 	}
 	c->current_idx = (c->current_idx + num_samples) % c->max_samples;
 	c->new_data = 1;
-	pthread_cond_signal(&audiobuf_cond);
-	pthread_mutex_unlock(&audiobuf_mutex);
-	// Compute DOA here if appropriate number of samples is obtained?
+	xcor_counter += num_samples;
+	if(xcor_counter >= NUMSAMPLES_XCOR/2 && mic1_d.size() >= NUMSAMPLES_XCOR) { // xcors overlap by 50%.
+
+
+		// for(int i=0; i<NUMSAMPLES_XCOR; ++i) {
+		// 	myfile << std::to_string(state.buffers[0][i]) << "\n";
+		// }
+
+		// memcpy(xcor_data[0], mic1, NUMSAMPLES_XCOR*sizeof(int32_t));
+		// memcpy(xcor_data[1], mic2, NUMSAMPLES_XCOR*sizeof(int32_t));
+		// memcpy(xcor_data[2], mic3, NUMSAMPLES_XCOR*sizeof(int32_t));
+		// memcpy(xcor_data[3], mic4, NUMSAMPLES_XCOR*sizeof(int32_t));
+		// memcpy(xcor_data[0], &(c->buffers[0]), NUMSAMPLES_XCOR*sizeof(int32_t));
+		// memcpy(xcor_data[1], &(c->buffers[1]), NUMSAMPLES_XCOR*sizeof(int32_t));
+		// memcpy(xcor_data[2], &(c->buffers[2]), NUMSAMPLES_XCOR*sizeof(int32_t));
+		// memcpy(xcor_data[3], &(c->buffers[3]), NUMSAMPLES_XCOR*sizeof(int32_t));
+
+		// memcpy(xcor_data[0], &state.buffers[0], NUMSAMPLES_XCOR*sizeof(int32_t));
+		// memcpy(xcor_data[1], &state.buffers[1], NUMSAMPLES_XCOR*sizeof(int32_t));
+		// memcpy(xcor_data[2], &state.buffers[2], NUMSAMPLES_XCOR*sizeof(int32_t));
+		// memcpy(xcor_data[3], &state.buffers[3], NUMSAMPLES_XCOR*sizeof(int32_t));
+
+		for(int i=0; i<NUMSAMPLES_XCOR; ++i) {
+			xcor_data[0][i] = mic1_d[i];
+			xcor_data[1][i] = mic2_d[i];
+			xcor_data[2][i] = mic3_d[i];
+			xcor_data[3][i] = mic4_d[i];
+		}
+
+		// for(int i=0; i<NUMSAMPLES_XCOR; ++i) {
+		// 	myfile << std::to_string(xcor_data[0][i]) << "\n";
+		// }
+		xcor_counter=0;
+
+		pthread_cond_signal(&audiobuf_cond);
+		pthread_mutex_unlock(&audiobuf_mutex);
+		printf("The estimated angle to the source is %f degrees\n", findAngle());
+	}
+	else {
+		pthread_cond_signal(&audiobuf_cond);
+		pthread_mutex_unlock(&audiobuf_mutex);		
+	}
 }
 
 void* freenect_threadfunc(void* arg) {
@@ -114,6 +236,12 @@ void* freenect_threadfunc(void* arg) {
 	freenect_stop_audio(f_dev);
 	freenect_close_device(f_dev);
 	freenect_shutdown(f_ctx);
+
+	for(int i=0; i<4; ++i) {
+		delete [] xcor_data[i];
+	}
+	delete [] xcor_data;
+
 	return NULL;
 }
 
@@ -176,6 +304,36 @@ void Keyboard(unsigned char key, int x, int y) {
 }
 
 int main(int argc, char** argv) {
+
+	// Dummy signals for debugging xcor
+	// for(int i=0; i<NUMSAMPLES_XCOR/2-30; ++i) {
+	// 	sig1[i] = 0;
+	// }
+
+	// for(int i=0; i<NUMSAMPLES_XCOR/2-40; ++i) {
+	// 	sig2[i] = 0;
+	// }
+
+	// for(int i=NUMSAMPLES_XCOR/2-30; i<NUMSAMPLES_XCOR-20; ++i) {
+	// 	sig1[i] = 1;
+	// }
+
+	// for(int i=NUMSAMPLES_XCOR/2-40; i<NUMSAMPLES_XCOR-30; ++i) {
+	// 	sig2[i] = 1;
+	// }
+	// for(int i=NUMSAMPLES_XCOR-20; i<NUMSAMPLES_XCOR; ++i) {
+	// 	sig1[i] = 0;
+	// }
+	// 	for(int i=NUMSAMPLES_XCOR-30; i<NUMSAMPLES_XCOR; ++i) {
+	// 	sig2[i] = 0;
+	// }
+
+	// printf("%d\n", xcor_td(sig1, sig2, NUMSAMPLES_XCOR, XCOR_WIDTH).second);
+	// return 0;
+	// myfile.open("myfile.csv");
+	// printf("%ld", mic4_d.size());
+
+
 	if (freenect_init(&f_ctx, NULL) < 0) {
 		printf("freenect_init() failed\n");
 		return 1;
@@ -201,6 +359,11 @@ int main(int argc, char** argv) {
 		freenect_shutdown(f_ctx);
 		return 1;
 	}
+
+	for(int i=0; i<4; ++i) {
+		xcor_data[i] = new int32_t[NUMSAMPLES_XCOR];
+	}
+
 
 	state.max_samples = 256 * 60;
 	state.current_idx = 0;
