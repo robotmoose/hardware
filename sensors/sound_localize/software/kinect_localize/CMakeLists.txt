@@ -23,7 +23,10 @@ add_library(freenect_fix ${freenect_fix_SRCS})
 set(dsp_SRCS src/xcor_td.cpp)
 add_library(dsp ${dsp_SRCS})
 
+set(graphics_SRCS GLEW glfw3 glut Xrandr Xrender Xinerama Xcursor Xi GL m dl drm Xdamage X11-xcb xcb-glx xcb-dri2 xcb-dri3 xcb-present xcb-sync xshmfence Xxf86vm Xfixes Xext X11 pthread xcb Xau Xdmcp)
+
 # Build the executable
 add_executable(Sound_Localize_Kinect Sound_Localize_Kinect.cpp)
 # Link against required libraries
-target_link_libraries(Sound_Localize_Kinect freenect freenect_fix dsp GL glut pthread)
+target_link_libraries(Sound_Localize_Kinect freenect freenect_fix dsp ${graphics_SRCS})
+
