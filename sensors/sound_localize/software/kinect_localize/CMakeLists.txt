@@ -20,13 +20,13 @@ set(freenect_fix_SRCS src/ofxKinectExtras.cpp)
 add_library(freenect_fix ${freenect_fix_SRCS})
 
 # Add sources required for dsp
-set(dsp_SRCS src/xcor_td.cpp)
+set(dsp_SRCS src/xcor_td.cpp src/Kinect_DOA.cpp)
 add_library(dsp ${dsp_SRCS})
 
-set(graphics_SRCS GLEW glfw3 glut Xrandr Xrender Xinerama Xcursor Xi GL m dl drm Xdamage X11-xcb xcb-glx xcb-dri2 xcb-dri3 xcb-present xcb-sync xshmfence Xxf86vm Xfixes Xext X11 pthread xcb Xau Xdmcp)
+set(graphics_SRCS GLEW glfw3 glut Xrandr Xrender Xinerama Xcursor Xi GL m dl drm Xdamage X11-xcb xcb-glx xcb-dri2 xcb-dri3 xcb-present xcb-sync xshmfence Xxf86vm Xfixes Xext X11 pthread xcb Xau Xdmcp SOIL)
 
 # Build the executable
 add_executable(Sound_Localize_Kinect Sound_Localize_Kinect.cpp)
 # Link against required libraries
-target_link_libraries(Sound_Localize_Kinect freenect freenect_fix dsp ${graphics_SRCS})
+target_link_libraries(Sound_Localize_Kinect freenect freenect_fix dsp ${graphics_SRCS} ${CMAKE_SOURCE_DIR}/bin/libSOIL.a)
 
