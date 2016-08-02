@@ -1,44 +1,37 @@
-/*
- * This file is part of the OpenKinect Project. http://www.openkinect.org
- *
- * Copyright (c) 2011 individual OpenKinect contributors. See the CONTRIB file
- * for details.
- *
- * This code is licensed to you under the terms of the Apache License, version
- * 2.0, or, at your option, the terms of the GNU General Public License,
- * version 2.0. See the APACHE20 and GPL2 files for the text of the licenses,
- * or the following URLs:
- * http://www.apache.org/licenses/LICENSE-2.0
- * http://www.gnu.org/licenses/gpl-2.0.txt
- *
- * If you redistribute this file in source form, modified or unmodified, you
- * may:
- *   1) Leave this header intact and distribute it under the same terms,
- *      accompanying it with the APACHE20 and GPL20 files, or
- *   2) Delete the Apache 2.0 clause and accompany it with the GPL2 file, or
- *   3) Delete the GPL v2 clause and accompany it with the APACHE20 file
- * In all cases you must keep the copyright notice intact and include a copy
- * of the CONTRIB file.
- *
- * Binary distributions must follow the binary distribution requirements of
- * either License.
- */
+// Sound_Localize_Kinect.cpp
+// Ryker Dial
+// UAF ITEST
 
+// Date Created: July 26, 2016
+// Last Modified: August 1, 2016
 
-// This file utilizes the Kinect microphone data collecting example micview.c included with
-//     libfreenect to implement sound source localization using the Kinect's microphone array.
+// ***** Overview ***** //
+// This program uses the microphone array on the Kinect v1 to estimate the direction to the dominant sound source
+//     in a 180 degree FOV in front of the Kinect. This program then draws an arrow on the screen that is the estimated
+//     angle.
+// The micview example provided with libfreenect was used as a guide to interfacing with the Kinect's microphone 
+//     array using libfreenect. 
 
+// ***** License ***** //
+// This code is licensed to you under the terms of the Apache License, version
+// 2.0, or, at your option, the terms of the GNU General Public License,
+// version 2.0. See the APACHE20 and GPL2 files for the text of the licenses,
+// or the following URLs:
+// http://www.apache.org/licenses/LICENSE-2.0
+// http://www.gnu.org/licenses/gpl-2.0.txt
+
+// General libraries
+#include <cstdio> // for printf
+
+// Libraries for libfreenect
 #include <libfreenect/libfreenect.h>
 #include <libfreenect/libfreenect_audio.h>
 #include "ofxKinectExtras.h"
-
-#include <cstdio>
 #include <pthread.h>
 
 // Libraries needed for OpenGL graphics
 #include <GL/glew.h>
 #include <GLFW/glfw3.h>
-#include "SOIL.h"
 #include "Shader.h"
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
@@ -65,7 +58,17 @@ static freenect_device* f_dev;
 Kinect_DOA kinect_DOA;
 int xcor_counter = 0; // Counts up to NUMSAMPLES_XCOR/2 to trigger xcor. 
 std::deque<int32_t> mic1_d, mic2_d, mic3_d, mic4_d; // Store microphone data streams
+static float angles[5];
+static int angle_counter = 0;
 static float angle = 0;
+
+typedef struct {
+	int64_t runAbsAve1;
+	int64_t runAbsAve2;
+} simple_filter;
+
+static simple_filter simple_filters[4];
+
 
 // ********** // 
 
@@ -150,36 +153,7 @@ int main() {
 		return -1;
 	}
 
-	// glViewport(0,0, WIDTH, HEIGHT);
-
-	// // Load in the background
-	// GLuint background_texture;
-	// glGenTextures(1, &background_texture);
-	// glBindTexture(GL_TEXTURE_2D, background_texture);
-
- //    // Set texture filtering
- //    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
- //    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-
-	// int width, height;
-	// unsigned char* background_image = SOIL_load_image("../background.jpg", &width, &height, 0, SOIL_LOAD_RGB);
-	// glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, width, height, 0, GL_RGB, GL_UNSIGNED_BYTE, background_image);
-	// glGenerateMipmap(GL_TEXTURE_2D);
-	// SOIL_free_image_data(background_image);
-	// glBindTexture(GL_TEXTURE_2D, 0); // Unbind the texture
-
 	Shader shader("../shaders/transformations.vs", "../shaders/transformations.frag");
-
-	// GLfloat background_vertices[] = {
-	// 	0.0f, 0.0f,
-	// 	0.0f, 1.0f,
-	// 	1.0f, 0.0f,
-	// 	1.0f, 1.0f
-	// };
-	// GLuint background_indices[] = {
-	// 	0, 1, 3,
-	// 	1, 2, 3
-	// };
 
     GLfloat arrow_vertices[] = {
     	0.0075f, 0.75f, 0.0f, // Top right of stem
@@ -214,16 +188,6 @@ int main() {
     glBindBuffer(GL_ARRAY_BUFFER, 0); // Note that this is allowed, the call to glVertexAttribPointer registered VBO as the currently bound vertex buffer object so afterwards we can safely unbind
 
     glBindVertexArray(0); // Unbind VAO (it's always a good thing to unbind any buffer/array to prevent strange bugs), remember: do NOT unbind the EBO, keep it bound to this VAO
-    // glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
-
-    // // Setup Background Texture
-    // glBindVertexArray(VAO[0]);
-
-    // glBindBuffer(GL_ARRAY_BUFFER, VBO[0]);
-    // glBufferData(GL_ARRAY_BUFFER, sizeof(background_vertices), background_vertices, GL_STATIC_DRAW);
-
-    // glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, EBO[0]);
-    // glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(background_indices), background_indices, GL_STATIC_DRAW);
 
 	while(!glfwWindowShouldClose(window)) {
 		glfwPollEvents();
@@ -236,23 +200,14 @@ int main() {
         // Draw our first triangle
         shader.Use();
 
-  //       glBindTexture(GL_TEXTURE_2D, background_texture);
-  //       glBindVertexArray(VAO[0]);
-  //       glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, EBO[0]);
-  //       glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
- 	// //	glBindVertexArray(0);
- 	// 	glBindTexture(GL_TEXTURE_2D, 0);
-
         // Create Transformations
 		glm::mat4 transform;
 		transform = glm::rotate(transform, glm::radians(angle), glm::vec3(0.0, 0.0, 1.0));
-		//transform = glm::translate(transform, glm::vec3(0.5f, -0.5f, 0.0f));
 
 		GLint transformLoc = glGetUniformLocation(shader.Program, "transform");
 		glUniformMatrix4fv(transformLoc, 1, GL_FALSE, glm::value_ptr(transform));
 
         glBindVertexArray(VAO[1]);
-        //glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, EBO[1]);
         glDrawElements(GL_TRIANGLES, 9, GL_UNSIGNED_INT, 0);
         glBindVertexArray(0);
 
@@ -306,21 +261,93 @@ void in_callback(freenect_device* dev, int num_samples,
 	}
 	xcor_counter += num_samples;
 	// Perform the DOA analysis if we have collected the appropriate number of samples.
-	if(xcor_counter >= kinect_DOA.NUMSAMPLES_XCOR/2 && mic1_d.size() >= kinect_DOA.NUMSAMPLES_XCOR) { // xcors overlap by 50%.
+	if( (xcor_counter >= kinect_DOA.NUMSAMPLES_XCOR/2) && (mic1_d.size() >= kinect_DOA.NUMSAMPLES_XCOR) ) { // xcors overlap by 50%.
+		// static int64_t runAbsAve1[4] = {0};
+		// static int64_t runAbsAve2[4] = {0};
+		// for(int i=0; i<4; ++i) {
+		// 	runAbsAve1[i] = 0;
+		// 	runAbsAve2[i] = 0;
+		// }
+		// for(int i=0; i<4; ++i) {
+		// 	simple_filters[i].runAbsAve1 = 0;
+		// 	simple_filters[i].runAbsAve2 = 0;
+		// }
+			
+
+		// // 
+		uint64_t sumd0[4] = {0};
+		uint64_t sumd1[4] = {0};
 
 		for(int i=0; i<kinect_DOA.NUMSAMPLES_XCOR; ++i) {
 			kinect_DOA.xcor_data[0][i] = mic1_d[i];
 			kinect_DOA.xcor_data[1][i] = mic2_d[i];
 			kinect_DOA.xcor_data[2][i] = mic3_d[i];
 			kinect_DOA.xcor_data[3][i] = mic4_d[i];
+
+			//printf("i: %d\n", i);
+			if(i>0) {
+				for(int j=0; j<4; ++j) {
+					sumd0[j] += abs(kinect_DOA.xcor_data[j][i]);
+					sumd1[j] += abs(kinect_DOA.xcor_data[j][i]-kinect_DOA.xcor_data[j][i-1]);
+				}
+			}
+
+		// 	// for(int j=0; j<4; ++j) {
+		// 	// 	mic_data << std::to_string(kinect_DOA.xcor_data[j][i]) << ",";
+		// 	// }
+		// 	// mic_data << "\n";
+
+			if(i >= 24 && i <= 24+16) {
+				for(int j=0; j<4; ++j)
+					simple_filters[j].runAbsAve1 += (abs(kinect_DOA.xcor_data[j][i]) - abs(kinect_DOA.xcor_data[j][i-24]));
+			}
+			if(i >= 24 + 16 && i <= 24+32) {
+				for(int j=0; j<4; ++j)
+					simple_filters[j].runAbsAve2 += (abs(kinect_DOA.xcor_data[j][i]) - abs(kinect_DOA.xcor_data[j][i-24]));
+			}
 		}
+
+		// http://stackoverflow.com/questions/3881256/can-you-programmatically-detect-white-noise
+		double wNoiseRatio = 0.6; // The higher this is, the lower the threshhold for audio to be detected as
+								  //     non white noise
+		bool whiteNoise = true;
+		for(int i=0; i<4; ++i) {
+			//printf(sumd1[i]/sumd0[i]);
+			//printf("Sumd0[%d]: %lu, Sumd1[%d]: %lu\n", i, sumd0[i], i, sumd1[i]);
+			if(((double)sumd1[i])/((double)sumd0[i]) < wNoiseRatio)
+				//printf("Channel %d is not like noise\n", i);
+				whiteNoise = false;
+		}
+
+		// int unusualDif = 1;
+		// for(int i=0; i<4; ++i) {
+		// 	// printf("runAbsAve1[%d]: %ld\n", i, simple_filters[i].runAbsAve1);
+		// 	// printf("runAbsAve2[%d]: %ld\n", i, simple_filters[i].runAbsAve2);
+		// 	// printf("runAbsAve1[%d] + runAbsAve2[%d]: %lu\n", i, i, runAbsAve1[i] + runAbsAve2[i]);
+		// 	//printf()
+		// 	if(abs(simple_filters[i].runAbsAve1-simple_filters[i].runAbsAve2)>(simple_filters[i].runAbsAve1+simple_filters[i].runAbsAve2)/(2*unusualDif)) {
+		// 		printf("Channel %d is not like white noise\n", i);
+		// 	}
+		// }
 
 		xcor_counter=0;
 
 		pthread_cond_signal(&audiobuf_cond);
 		pthread_mutex_unlock(&audiobuf_mutex);
-		angle = kinect_DOA.findAngle();
-		printf("The estimated angle to the source is %f degrees\n", angle);
+		if(!whiteNoise) {	
+			angles[angle_counter] = kinect_DOA.findAngle();
+
+			if((++angle_counter >= 2)) {
+				 if(!(fabs(angles[0]-angles[1]) > 20.0)) {
+					float angle_avg = 0;
+					for(int i=0; i<2; ++i)
+						angle_avg += angles[i];
+					angle = angle_avg/2;
+				 }
+				angle_counter = 0;
+			}
+			//printf("The estimated angle to the source is %f degrees\n", angle);
+		}
 	}
 	else {
 		pthread_cond_signal(&audiobuf_cond);
