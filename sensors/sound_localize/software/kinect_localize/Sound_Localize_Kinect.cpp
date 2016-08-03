@@ -22,6 +22,7 @@
 
 // General libraries
 #include <cstdio> // for printf
+#include <iostream>
 
 // Libraries for libfreenect
 #include <libfreenect/libfreenect.h>
@@ -36,6 +37,10 @@
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtc/type_ptr.hpp>
+
+// Libraries needed for robotmoose integration
+#include <fstream>
+#include <string>
 
 // Libraries needed for DSP
 #include <deque>
@@ -72,6 +77,14 @@ static simple_filter simple_filters[4];
 
 // ********** // 
 
+typedef struct {
+	std::string superstar = "https://www.robotmoose.com";
+	std::string name = "";
+	std::string auth = "";
+} robotmoose_config;
+
+robotmoose_config robot;
+
 static const bool KINECT_1473 = true; // Need to upload special firmware if using Kinect Model #1473
 
 const GLuint WIDTH = 800, HEIGHT = 600;
@@ -79,6 +92,7 @@ const GLuint WIDTH = 800, HEIGHT = 600;
 // ******************** // 
 
 // Function Prototypes
+void parse_config_string(std::string line);
 void key_callback(GLFWwindow* window, int key, int scancode, int action, int mode);
 void in_callback(freenect_device* dev, int num_samples,
                  int32_t* mic1, int32_t* mic2,
@@ -86,9 +100,37 @@ void in_callback(freenect_device* dev, int num_samples,
                  int16_t* cancelled, void *unknown);
 void* freenect_threadfunc(void* arg);
 
-int main() {
+int main(int argc, char* argv[]) {
+
 	if (freenect_init(&f_ctx, NULL) < 0) {
 		printf("freenect_init() failed\n");
+		return 1;
+	}
+
+	// Parse either command line arguments or config file for robot config
+	if(argc < 2) {
+		std::ifstream robot_conf("robot.conf");
+		if(robot_conf.good()) {
+			std::string buffer;
+			while(!robot_conf.eof()) {
+				std::getline(robot_conf, buffer);
+				if((buffer[0] != '#') && (buffer[0] != '\0')) // lines that start with # are comments
+					parse_config_string(buffer); 
+			}
+			robot_conf.close();
+		}
+		else {
+			std::cout << "Error: No robot config entered and could not open config file.\n";
+			return 1;
+		}
+	}
+	else {
+		for(int i = 1; i < argc; ++i) {
+			parse_config_string(argv[i]);
+		}
+	}
+	if(robot.name == "") {
+		std::cout << "Error: No robot name entered\n";
 		return 1;
 	}
 
@@ -141,7 +183,7 @@ int main() {
 	if(window == nullptr) {
 		printf("Failed to create GLFW window!\n");
 		glfwTerminate();
-		return -1;
+		return 1;
 	}
 	glfwMakeContextCurrent(window);
 
@@ -150,10 +192,10 @@ int main() {
 	glewExperimental = GL_TRUE;
 	if(glewInit() != GLEW_OK) {
 		printf("Failed to initialize GLEW!\n");
-		return -1;
+		return 1;
 	}
 
-	Shader shader("../shaders/transformations.vs", "../shaders/transformations.frag");
+	Shader shader(".//shaders/transformations.vs", "./shaders/transformations.frag");
 
     GLfloat arrow_vertices[] = {
     	0.0075f, 0.75f, 0.0f, // Top right of stem
@@ -226,6 +268,29 @@ int main() {
 	
 	// ***** End Graphics Setup ***** //
 	return 0;
+}
+
+void parse_config_string(std::string str) {
+	std::string key, value;
+	bool key_fin = false;
+	int idx = 0;
+	while(true) {
+		if(str[idx] == '\0') break;
+		else if(str[idx] == '=') {
+			key_fin = true;
+			++idx;
+		}
+		else if(str[idx] == ' ' || str[idx] == '"' || str[idx] == '\'') 
+			++idx; // skip spaces, quotations, and apostrophes
+		else if(!key_fin) key += str[idx++];
+		else value += str[idx++];
+	}
+	if(key == "robot") robot.name = value;
+	else if(key == "superstar") robot.superstar = value;
+	else if(key == "auth") robot.auth = value;
+	else std::cout << "Unrecognized Input\n";
+	std::cout << "Key: " << key << std:: endl;
+	std::cout << "Value: " << value << std::endl;
 }
 
 void key_callback(GLFWwindow* window, int key, int scancode, int action, int mode) {
@@ -308,7 +373,7 @@ void in_callback(freenect_device* dev, int num_samples,
 		}
 
 		// http://stackoverflow.com/questions/3881256/can-you-programmatically-detect-white-noise
-		double wNoiseRatio = 0.6; // The higher this is, the lower the threshhold for audio to be detected as
+		double wNoiseRatio = 0.7; // The higher this is, the lower the threshhold for audio to be detected as
 								  //     non white noise
 		bool whiteNoise = true;
 		for(int i=0; i<4; ++i) {
