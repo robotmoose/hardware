@@ -1,0 +1,16 @@
+//Arm dimensions
+
+//from shoulder/ball joint to forearm
+first length = 8 inches or (8in*2.5cm = 20cm)   215mm 
+
+//forearm
+9 inches or (9in * 2.5cm = 22.5cm) 200mm
+
+//wrist
+
+//finger
+2inches on each side of the corner or 4 inches total = 5cm = 50mm
+
+35mm for bottom 
+50mm for top including tip
+30mm w/o tip
