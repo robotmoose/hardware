@@ -1,2 +1,0 @@
-http://www.djerickson.com/arduino/
-Good analysis of Arduino ADC capabilities
