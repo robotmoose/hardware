@@ -1,5 +1,6 @@
 
 include <layla_config.scad>;
+$fs=0.1; $fa=5;
 
 // Distance outside axle for reinforcing
 thickwall=4.0;
